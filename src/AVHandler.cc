@@ -88,7 +88,6 @@ AVHandler::~AVHandler(void) {
     if (video_outbuf) {
 	av_free(video_outbuf);
     }
-   
 }
 
 int
@@ -161,8 +160,10 @@ AVHandler::setup_read() {
 	return -1;
     }
 
-    AVDictionary **options = new AVDictionary * [av_input->nb_streams];
+    AVDictionary **options = (AVDictionary **)av_mallocz(av_input->nb_streams * sizeof(AVDictionary *));
+#if 0
     unsigned int stream_id = 0;
+#endif
 
     if (avformat_find_stream_info(av_input, options) < 0) {
 	(*out) << "AVHandler: No stream information available" << std::endl;
@@ -172,6 +173,9 @@ AVHandler::setup_read() {
     for (unsigned int i=0; i < av_input->nb_streams; i++) {
 	if (av_input->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO) {
 	    vstream = av_input->streams[i];
+#if 0
+        stream_id = i;
+#endif
 	    break;
 	}
     }
@@ -183,7 +187,6 @@ AVHandler::setup_read() {
     for (unsigned int i=0; i < av_input->nb_streams; i++) {
 	if (av_input->streams[i]->codec->codec_type == AVMEDIA_TYPE_AUDIO) {
 	    astream = av_input->streams[i];
-        stream_id = i;
 	    break;
 	}
     }
@@ -213,9 +216,17 @@ AVHandler::setup_read() {
     width = vstream->codec->width;
     height = vstream->codec->height;
 
+#if 0
     title = av_dict_get(options[stream_id], "title", NULL, 0)->value;
     author = av_dict_get(options[stream_id], "author", NULL, 0)->value;
     comment = av_dict_get(options[stream_id], "comment", NULL, 0)->value;
+#endif
+
+    for (unsigned int i = 0; i < av_input->nb_streams; i++)
+    {
+        av_dict_free(&options[i]);
+    }
+    av_freep(&options);
 
     rgbframe = create_frame(PIX_FMT_RGB24);
     if (!rgbframe) return -1;
@@ -251,6 +262,12 @@ AVHandler::write_frame() {
 				      SWS_BICUBIC, 0, 0, 0);
       sws_scale(sc, rgbframe->data, rgbframe->linesize, 0,
 		c->height, frame->data, frame->linesize);
+    }
+
+    if (NULL == frame) {
+    // this is a workaround to avoid segmentation fault of calling
+    // avcodec_encode_video2() below
+    return 0;
     }
 
     int output_ready;
