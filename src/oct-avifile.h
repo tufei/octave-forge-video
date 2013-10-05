@@ -54,8 +54,8 @@ class Avifile: public octave_base_value {
 
   std::string filename;
   unsigned int frames;
-  unsigned int frame_rows;
-  unsigned int frame_columns;
+  int frame_rows;
+  int frame_columns;
 
   DECLARE_OCTAVE_ALLOCATOR
   DECLARE_OV_TYPEID_FUNCTIONS_AND_DATA

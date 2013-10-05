@@ -101,8 +101,8 @@ Avifile::addframe(const NDArray &f) {
 	return;
     }
     
-    for (unsigned int y = 0; y < frame_rows; y++) {
-      for (unsigned int x = 0; x < frame_columns; x++) {
+    for (int y = 0; y < frame_rows; y++) {
+      for (int x = 0; x < frame_columns; x++) {
 	if (bands == 3) {
 	  rgbframe->data[0][y * rgbframe->linesize[0] + 3*x + 2] = (unsigned char)(f(y,x,0)*255);
 	  rgbframe->data[0][y * rgbframe->linesize[0] + 3*x + 1] = (unsigned char)(f(y,x,1)*255);

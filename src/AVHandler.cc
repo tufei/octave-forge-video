@@ -32,6 +32,7 @@ extern "C" {
 #include <ffmpeg/swscale.h>
 #elif defined(HAVE_LIBAVFORMAT_AVFORMAT_H)
 #include <libswscale/swscale.h>
+#include <libavutil/dict.h>
 #else
 #error "Missing ffmpeg headers"
 #endif
@@ -64,7 +65,7 @@ AVHandler::~AVHandler(void) {
 	if (av_output->pb->buf_ptr) {
 	    while (write_frame() > 0) {}
 	    av_write_trailer(av_output);
-	    if (url_fclose( av_output->pb ) < 0)
+	    if (avio_close( av_output->pb ) < 0)
 		(*out) << "AVHandler: cannot close output file" << std::endl;
 	}
 	av_free(av_output);
@@ -78,7 +79,7 @@ AVHandler::~AVHandler(void) {
     }
 
     if (av_input) {
-	av_close_input_file(av_input);
+	avformat_close_input(&av_input);
     } else {
 	// close output stream
 	if (vstream) av_freep(&vstream);    
@@ -92,21 +93,25 @@ AVHandler::~AVHandler(void) {
 
 int
 AVHandler::setup_write() {
+    AVDictionary *options = NULL;
+
     av_register_all();
 
-    AVOutputFormat *avifmt;   
-    for (avifmt = first_oformat; avifmt != NULL; avifmt = avifmt->next) {
-	if (std::string(avifmt->name) == "avi") {
-	    break;
-	}
+    AVOutputFormat *avifmt = NULL;
+    avifmt = av_oformat_next(avifmt);
+    while (avifmt != NULL) {
+    if (std::string(avifmt->name) == "avi") {
+        break;
     }
-    
+    avifmt = av_oformat_next(avifmt);
+    }
+
     if (!avifmt) {
 	(*out) << "AVHandler: Error finding AVI output format" << std::endl;
 	return -1;
     }
     
-    av_output = av_alloc_format_context();
+    av_output = avformat_alloc_context();
     if (!av_output) {
 	(*out) << "AVHandler: Memory error allocating format context" << std::endl;
 	return -1;
@@ -120,18 +125,13 @@ AVHandler::setup_write() {
 	if (add_video_stream() != 0) return -1;
     }
     
-    /* av_set_parameters is mandatory */
-    if (av_set_parameters(av_output, NULL) < 0) {
-	(*out) << "AVHandler: Error setting output format parameters" << std::endl;
-	return -1;
-    }
-
     snprintf(av_output->filename, sizeof(av_output->filename), "%s", filename.c_str());
-    snprintf(av_output->title, sizeof(av_output->title), "%s", title.c_str());
-    snprintf(av_output->author, sizeof(av_output->author), "%s", author.c_str());
-    snprintf(av_output->comment, sizeof(av_output->comment), "%s", comment.c_str());
-    
-    if (url_fopen(&av_output->pb, filename.c_str(), URL_WRONLY) < 0) {
+
+    av_dict_set(&options, "title", title.c_str(), 0);
+    av_dict_set(&options, "author", author.c_str(), 0);
+    av_dict_set(&options, "comment", comment.c_str(), 0);
+
+    if (avio_open(&av_output->pb, filename.c_str(), AVIO_FLAG_WRITE) < 0) {
 	(*out) << "AVHandler: Could not open \"" << filename << "\" for output" << std::endl;
 	return -1;
     }
@@ -142,8 +142,13 @@ AVHandler::setup_write() {
     rgbframe = create_frame(PIX_FMT_RGB24);
     if (!frame || !rgbframe) return -1;
     
-    av_write_header(av_output);
-    
+    if (avformat_write_header(av_output, &options) < 0) {
+	(*out) << "AVHandler: Error writing headers" << std::endl;
+	return -1;
+    }
+
+    av_dict_free(&options);
+
     return 0;
 }
 
@@ -151,18 +156,21 @@ int
 AVHandler::setup_read() {
     av_register_all();
 
-    if (av_open_input_file(&av_input, filename.c_str(), NULL, 0, NULL) != 0) {
+    if (avformat_open_input(&av_input, filename.c_str(), NULL, NULL) != 0) {
 	(*out) << "AVHandler: Could not open \"" << filename << "\" for reading" << std::endl;
 	return -1;
     }
 
-    if (av_find_stream_info(av_input) < 0) {
+    AVDictionary **options = new AVDictionary * [av_input->nb_streams];
+    unsigned int stream_id = 0;
+
+    if (avformat_find_stream_info(av_input, options) < 0) {
 	(*out) << "AVHandler: No stream information available" << std::endl;
 	return -1;
     }
 
-    for (int i=0; i < av_input->nb_streams; i++) {
-	if (av_input->streams[i]->codec->codec_type == CODEC_TYPE_VIDEO) {
+    for (unsigned int i=0; i < av_input->nb_streams; i++) {
+	if (av_input->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO) {
 	    vstream = av_input->streams[i];
 	    break;
 	}
@@ -172,9 +180,10 @@ AVHandler::setup_read() {
 	return -1;
     }
 
-    for (int i=0; i < av_input->nb_streams; i++) {
-	if (av_input->streams[i]->codec->codec_type == CODEC_TYPE_AUDIO) {
+    for (unsigned int i=0; i < av_input->nb_streams; i++) {
+	if (av_input->streams[i]->codec->codec_type == AVMEDIA_TYPE_AUDIO) {
 	    astream = av_input->streams[i];
+        stream_id = i;
 	    break;
 	}
     }
@@ -192,7 +201,7 @@ AVHandler::setup_read() {
     if (codec->capabilities & CODEC_CAP_TRUNCATED)
 	vstream->codec->flags |= CODEC_FLAG_TRUNCATED;
 
-    if (avcodec_open(vstream->codec, codec) < 0) {
+    if (avcodec_open2(vstream->codec, codec, NULL) < 0) {
 	(*out) << "AVHandler: Cannot open codec " << codec_name << std::endl;
 	vstream->codec->codec = NULL;
 	return -1;
@@ -204,9 +213,9 @@ AVHandler::setup_read() {
     width = vstream->codec->width;
     height = vstream->codec->height;
 
-    title = av_input->title;
-    author = av_input->author;
-    comment = av_input->comment;
+    title = av_dict_get(options[stream_id], "title", NULL, 0)->value;
+    author = av_dict_get(options[stream_id], "author", NULL, 0)->value;
+    comment = av_dict_get(options[stream_id], "comment", NULL, 0)->value;
 
     rgbframe = create_frame(PIX_FMT_RGB24);
     if (!rgbframe) return -1;
@@ -243,22 +252,23 @@ AVHandler::write_frame() {
       sws_scale(sc, rgbframe->data, rgbframe->linesize, 0,
 		c->height, frame->data, frame->linesize);
     }
-    
-    int out_size = avcodec_encode_video(c, video_outbuf,
-					VIDEO_OUTBUF_SIZE,
-					frame);
-    if (out_size > 0) {
-	AVPacket pkt;
-	av_init_packet(&pkt);
-	
-	pkt.stream_index = vstream->index;
-	pkt.data = video_outbuf;
-	pkt.size = out_size;
-	
+
+    int output_ready;
+    AVPacket pkt;
+
+    pkt.data = video_outbuf;
+    pkt.size = VIDEO_OUTBUF_SIZE;
+
+	if (avcodec_encode_video2(c, &pkt, frame, &output_ready) < 0) {
+	    (*out) << "AVHandler: error encoding video frame" << std::endl;
+	    return -1;
+	}
+
+    if (output_ready) {
 	if (c->coded_frame)
 	    pkt.pts = c->coded_frame->pts;
 	if (c->coded_frame && c->coded_frame->key_frame)
-	    pkt.flags |= PKT_FLAG_KEY;
+	    pkt.flags |= AV_PKT_FLAG_KEY;
 	/// XXX FIXME XXX does this ensure that the first frame is always a key frame?
 	
 	if (av_write_frame(av_output, &pkt) != 0) {
@@ -269,7 +279,7 @@ AVHandler::write_frame() {
     }
     
     frame_nr++;
-    return out_size;
+    return output_ready ? pkt.size : 0;
 }
 
 int
@@ -280,7 +290,7 @@ AVHandler::read_frame(unsigned int nr) {
 
     // Calculate timestamp of target frame
     uint64_t start_time = 0;
-    if ((uint64_t)vstream->start_time != AV_NOPTS_VALUE) {
+    if ((uint64_t)vstream->start_time != (uint64_t)AV_NOPTS_VALUE) {
 	start_time = vstream->start_time;
     }
     uint64_t target_timestamp = start_time + nr*(uint64_t)(AV_TIME_BASE / framerate);
@@ -296,7 +306,7 @@ AVHandler::read_frame(unsigned int nr) {
        	(*out) << "AVHandler: Error seeking to " << target_timestamp << std::endl;
        	return -1;
     }
-    cc->hurry_up = 1;
+    cc->skip_frame = AVDISCARD_NONKEY;
 
     // Flush stream buffers after seek
     avcodec_flush_buffers(cc);
@@ -331,7 +341,7 @@ AVHandler::read_frame(unsigned int nr) {
 
 	// Decode the packet into a frame
 	int frameFinished;
-	if (avcodec_decode_video(cc, frame, &frameFinished, packet.data, packet.size) < 0) {
+	if (avcodec_decode_video2(cc, frame, &frameFinished, &packet) < 0) {
 	    (*out) << "AVHandler: Error decoding video stream" << std::endl;
 	    av_free_packet(&packet);
 	    av_free(frame); frame = NULL;
@@ -342,7 +352,7 @@ AVHandler::read_frame(unsigned int nr) {
 	    current_timestamp = (uint64_t)(vstream->cur_dts * AV_TIME_BASE * (long double)stream_time_base);
 	}
     }
-    cc->hurry_up = 0;
+    cc->skip_frame = AVDISCARD_NONE;
 
     SwsContext *sc = sws_getContext(cc->width, cc->height, cc->pix_fmt, 
 				    cc->width, cc->height, PIX_FMT_BGR24, 
@@ -361,9 +371,11 @@ AVHandler::print_file_formats() {
     (*out) << "Supported file formats:" << std::endl;
     av_register_all();
 
-    AVOutputFormat *ofmt;
-    for (ofmt = first_oformat; ofmt != NULL; ofmt = ofmt->next) {
-	(*out) << ofmt->name << " ";
+    AVOutputFormat *avifmt = NULL;
+    avifmt = av_oformat_next(avifmt);
+    while (avifmt != NULL) {
+    (*out) << avifmt->name << " ";
+    avifmt = av_oformat_next(avifmt);
     }
     (*out) << std::endl << std::endl;
 }
@@ -375,8 +387,8 @@ AVHandler::print_codecs() {
 
     AVCodec *codec;
     for (codec = av_codec_next(0); codec != NULL; codec = av_codec_next(codec)) {
-	if ((codec->type == CODEC_TYPE_VIDEO) &&
-	    (codec->encode)) {	    
+	if ((codec->type == AVMEDIA_TYPE_VIDEO) &&
+	    (codec->encode2)) {	    
 	    (*out) << codec->name << " ";
 	}
     }
@@ -387,15 +399,16 @@ int
 AVHandler::add_video_stream() {
     AVCodecContext *cc;
     
-    vstream = av_new_stream(av_output, 0);
+    vstream = avformat_new_stream(av_output, NULL);
     if (!vstream) {
 	(*out) << "AVHandler: error opening video output stream" << std::endl;
 	return -1;
     }
+    vstream->id = 0;
     
     cc = vstream->codec;
 
-    cc->codec_type = CODEC_TYPE_VIDEO;
+    cc->codec_type = AVMEDIA_TYPE_VIDEO;
     
     cc->bit_rate = bitrate;
     cc->width = width;
@@ -426,7 +439,7 @@ AVHandler::init_video_codecs() {
 	return -1;
     }
 
-    if (avcodec_open(cc, codec) < 0) {
+    if (avcodec_open2(cc, codec, NULL) < 0) {
 	(*out) << "AVHandler: cannot open codec" << std::endl;
 	cc->codec = NULL;
 	return -1;

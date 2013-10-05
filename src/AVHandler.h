@@ -25,6 +25,14 @@
 #ifndef _AVHANDLER_H
 #define _AVHANDLER_H
 
+#ifndef UINT64_C
+#if __WORDSIZE == 64
+#define UINT64_C(c)	c ## UL
+#else
+#define UINT64_C(c)	c ## ULL
+#endif
+#endif
+
 #define VIDEO_OUTBUF_SIZE 200000
 
 #define INT64_C
@@ -35,6 +43,7 @@ extern "C" {
 #include <ffmpeg/avformat.h>
 #elif defined(HAVE_LIBAVFORMAT_AVFORMAT_H)
 #include <libavformat/avformat.h>
+#include <libavformat/avio.h>
 #else
 #error "Missing ffmpeg headers"
 #endif
@@ -172,8 +181,8 @@ class AVHandler {
   }
 
   unsigned int get_filesize() const {
-    if (av_input) {
-      return av_input->file_size;
+    if (av_input && av_input->pb) {
+      return avio_size(av_input->pb);
     } else {
       return 0;
     }
