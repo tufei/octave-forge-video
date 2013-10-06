@@ -161,9 +161,7 @@ AVHandler::setup_read() {
     }
 
     AVDictionary **options = (AVDictionary **)av_mallocz(av_input->nb_streams * sizeof(AVDictionary *));
-#if 0
     unsigned int stream_id = 0;
-#endif
 
     if (avformat_find_stream_info(av_input, options) < 0) {
 	(*out) << "AVHandler: No stream information available" << std::endl;
@@ -173,9 +171,7 @@ AVHandler::setup_read() {
     for (unsigned int i=0; i < av_input->nb_streams; i++) {
 	if (av_input->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO) {
 	    vstream = av_input->streams[i];
-#if 0
         stream_id = i;
-#endif
 	    break;
 	}
     }
@@ -216,11 +212,16 @@ AVHandler::setup_read() {
     width = vstream->codec->width;
     height = vstream->codec->height;
 
-#if 0
-    title = av_dict_get(options[stream_id], "title", NULL, 0)->value;
-    author = av_dict_get(options[stream_id], "author", NULL, 0)->value;
-    comment = av_dict_get(options[stream_id], "comment", NULL, 0)->value;
-#endif
+    if (options[stream_id]) {
+    AVDictionaryEntry *entry = NULL;
+
+    entry = av_dict_get(options[stream_id], "title", NULL, 0);
+    if (entry) title = entry->value;
+    entry = av_dict_get(options[stream_id], "author", NULL, 0);
+    if (entry) author = entry->value;
+    entry = av_dict_get(options[stream_id], "comment", NULL, 0);
+    if (entry) comment = entry->value;
+    }
 
     for (unsigned int i = 0; i < av_input->nb_streams; i++)
     {
