@@ -264,7 +264,7 @@ AVHandler::write_frame() {
 		c->height, frame->data, frame->linesize);
     }
 
-    if (NULL == frame) {
+    if (NULL == frame && !(c->codec->capabilities & CODEC_CAP_DELAY)) {
     // this is a workaround to avoid segmentation fault of calling
     // avcodec_encode_video2() below
     return 0;
