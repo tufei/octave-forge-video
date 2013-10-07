@@ -422,8 +422,7 @@ AVHandler::add_video_stream() {
 	(*out) << "AVHandler: error opening video output stream" << std::endl;
 	return -1;
     }
-    vstream->id = 0;
-    
+
     cc = vstream->codec;
 
     cc->codec_type = AVMEDIA_TYPE_VIDEO;
