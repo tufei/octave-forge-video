@@ -25,6 +25,7 @@
 #include "AVHandler.h"
 
 #include <string>
+#include <cassert>
 #include <cstdlib>
 
 extern "C" {
@@ -92,8 +93,6 @@ AVHandler::~AVHandler(void) {
 
 int
 AVHandler::setup_write() {
-    AVDictionary *options = NULL;
-
     av_register_all();
 
     AVOutputFormat *avifmt = NULL;
@@ -126,9 +125,11 @@ AVHandler::setup_write() {
     
     snprintf(av_output->filename, sizeof(av_output->filename), "%s", filename.c_str());
 
-    av_dict_set(&options, "title", title.c_str(), 0);
-    av_dict_set(&options, "author", author.c_str(), 0);
-    av_dict_set(&options, "comment", comment.c_str(), 0);
+    assert(vstream == av_output->streams[vstream->index]);
+
+    av_dict_set(&vstream->metadata, "title", title.c_str(), 0);
+    av_dict_set(&vstream->metadata, "author", author.c_str(), 0);
+    av_dict_set(&vstream->metadata, "comment", comment.c_str(), 0);
 
     if (avio_open(&av_output->pb, filename.c_str(), AVIO_FLAG_WRITE) < 0) {
 	(*out) << "AVHandler: Could not open \"" << filename << "\" for output" << std::endl;
@@ -140,13 +141,13 @@ AVHandler::setup_write() {
     frame = create_frame(vstream->codec->pix_fmt);
     rgbframe = create_frame(PIX_FMT_RGB24);
     if (!frame || !rgbframe) return -1;
-    
-    if (avformat_write_header(av_output, &options) < 0) {
+
+    if (avformat_write_header(av_output, NULL) < 0) {
 	(*out) << "AVHandler: Error writing headers" << std::endl;
 	return -1;
     }
 
-    av_dict_free(&options);
+    av_dict_free(&vstream->metadata);
 
     return 0;
 }
@@ -160,10 +161,7 @@ AVHandler::setup_read() {
 	return -1;
     }
 
-    AVDictionary **options = (AVDictionary **)av_mallocz(av_input->nb_streams * sizeof(AVDictionary *));
-    unsigned int stream_id = 0;
-
-    if (avformat_find_stream_info(av_input, options) < 0) {
+    if (avformat_find_stream_info(av_input, NULL) < 0) {
 	(*out) << "AVHandler: No stream information available" << std::endl;
 	return -1;
     }
@@ -171,7 +169,6 @@ AVHandler::setup_read() {
     for (unsigned int i=0; i < av_input->nb_streams; i++) {
 	if (av_input->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO) {
 	    vstream = av_input->streams[i];
-        stream_id = i;
 	    break;
 	}
     }
@@ -212,22 +209,16 @@ AVHandler::setup_read() {
     width = vstream->codec->width;
     height = vstream->codec->height;
 
-    if (options[stream_id]) {
+    if (vstream->metadata) {
     AVDictionaryEntry *entry = NULL;
 
-    entry = av_dict_get(options[stream_id], "title", NULL, 0);
+    entry = av_dict_get(vstream->metadata, "title", NULL, AV_DICT_IGNORE_SUFFIX);
     if (entry) title = entry->value;
-    entry = av_dict_get(options[stream_id], "author", NULL, 0);
+    entry = av_dict_get(vstream->metadata, "author", NULL, AV_DICT_IGNORE_SUFFIX);
     if (entry) author = entry->value;
-    entry = av_dict_get(options[stream_id], "comment", NULL, 0);
+    entry = av_dict_get(vstream->metadata, "comment", NULL, AV_DICT_IGNORE_SUFFIX);
     if (entry) comment = entry->value;
     }
-
-    for (unsigned int i = 0; i < av_input->nb_streams; i++)
-    {
-        av_dict_free(&options[i]);
-    }
-    av_freep(&options);
 
     rgbframe = create_frame(PIX_FMT_RGB24);
     if (!rgbframe) return -1;
