@@ -18,7 +18,7 @@ endfor
 printf("\n")
 clear m
 
-m = avifile("test2.avi", "codec", codec)
+m = avifile("test2.avi", "codec", codec, "title", "Journey To The West")
 for i = 1:100
   I = zeros(100,100,3);
   
@@ -44,4 +44,5 @@ clear m
 aviinfo("test.avi")
 aviinfo("test2.avi")
 y = aviread("test2.avi", 15);
-imshow(y(:,:,1), y(:,:,2), y(:,:,3))
+#imshow(y(:,:,1), y(:,:,2), y(:,:,3))
+imshow(y);
