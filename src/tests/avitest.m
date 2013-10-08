@@ -2,7 +2,7 @@
 
 codec = "msmpeg4v2"
 
-m = avifile("test.avi", "codec", codec, "fps", 25, "bitrate", 500000)
+m = avifile("test.avi", "codec", codec, "fps", 23.97, "bitrate", 500000)
 for i = 1:100
   I = zeros(100,100);
   I(i,:) = i;

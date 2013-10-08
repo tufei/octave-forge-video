@@ -34,6 +34,7 @@ extern "C" {
 #elif defined(HAVE_LIBAVFORMAT_AVFORMAT_H)
 #include <libswscale/swscale.h>
 #include <libavutil/dict.h>
+#include <libavutil/rational.h>
 #else
 #error "Missing ffmpeg headers"
 #endif
@@ -423,8 +424,12 @@ AVHandler::add_video_stream() {
     cc->height = height;
 
     // XXX TODO XXX Make sure this calculation is correct //
+#if 0
     cc->time_base.num = 1;
     cc->time_base.den = (int)(framerate);
+#else
+    cc->time_base = av_inv_q(av_d2q(framerate, INT_MAX));
+#endif
     cc->pix_fmt = PIX_FMT_YUV420P;
 
     cc->gop_size = gop_size;

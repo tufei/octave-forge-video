@@ -64,7 +64,7 @@ class AVHandler {
     frame_nr = 0;
     
     bitrate = 400000;
-    framerate = 25;
+    framerate = 25.0;
     gop_size = 10;
     width = 352;
     height = 288;
