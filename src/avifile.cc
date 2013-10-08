@@ -117,7 +117,7 @@ To see a list of the available codecs, do @code{avifile(\"codecs\")}.\n\
     m->av->set_gop_size(gop_size);
     m->av->set_framerate(fps);
 
-    // Doesn't look like these values are ever encoded
+    // AVI muxer currently only has the title tag supported
     m->av->set_title(title);
     m->av->set_author(author);
     m->av->set_comment(comment);
