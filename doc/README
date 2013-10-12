@@ -1,0 +1,30 @@
+Dependencies
+------------
+This package _should_ always work with the latest version of ffmpeg. It is
+known to at least work with ffmpeg SVN revision 15410.
+
+You can download ffmpeg from
+http://ffmpeg.mplayerhq.hu
+
+Note that you'll need to configure it with --enable-swscale and --enable-gpl,
+to enable the software scaler library (used for yuv/rgb conversions).
+
+Usage Notes
+-----------
+- If ffmpeg complains about "too many threads", increase the frame height
+  and width.  For some obscure reason, they do a comparison between the number
+  of threads and the frame dimensions.
+  
+- Remember to `clear' a movie after adding the last frame.  This gives
+  `avifile' a chance to write some headers and close the file, i.e.
+  
+  octave:1> x = avifile("test.avi", "msmpeg4v2");
+  octave:2> addframe(x, zeros(100,100));
+  octave:3> clear x
+
+- If `aviinfo' crashes, you might have run into a libstdc++ memory allocation
+  bug.  Work around the problem by executing
+  
+  $ export GLIBCXX_FORCE_NEW=1
+  
+  before running Octave.

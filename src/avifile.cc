@@ -28,15 +28,15 @@
 template <typename Num>
 void setp(Num &p, Num v) {
     if (!error_state) {
-	p = v;
+        p = v;
     } else {
-	error_state = 0;
+        error_state = 0;
     }
 }
 
 DEFUN_DLD(avifile, args, nargout,
 "-*- texinfo -*-\n\
-@deftypefn {Loadable Function} {@var{f} =} avifile (@var{filename}, [@var{parameter}, @var{value}, ...])\n\
+@deftypefn {Loadable Function} {@var{f} =} avifile (@var{filename}, [@var{parameter}, @var{value}, @dots{}])\n\
 @deftypefnx {Loadable Function} avifile (\"codecs\")\n\
 Create an AVI-format video file.\n\
 \n\
@@ -65,23 +65,23 @@ To see a list of the available codecs, do @code{avifile(\"codecs\")}.\n\
     octave_value_list retval;
 
     if ( (args.length() == 1) && (args(0).string_value() == "codecs") ) {
-	AVHandler::print_codecs();
-	return retval;
+        AVHandler::print_codecs();
+        return retval;
     }
 
     if ((args.length() == 0) || (args.length() % 2 != 1)) {
-	print_usage();
-	return retval;
+        print_usage();
+        return retval;
     }
 
     std::string filename = args(0).string_value();
     if (error_state) {
-	print_usage();
-	return retval;
+        print_usage();
+        return retval;
     }
 
     // Parse parameters
-    std::string codec = "msmpeg4v2";
+    std::string codec = "mpeg4";
     unsigned int bitrate = 400000;
     int gop_size = 10;
     double fps = 25;
@@ -90,34 +90,34 @@ To see a list of the available codecs, do @code{avifile(\"codecs\")}.\n\
     std::string comment = "Created using Octave-Avifile";
 
     for (int i = 1; i < args.length(); i++) {
-	std::string p = args(i).string_value();
-	octave_value v = args(i+1);
-	if (!error_state) {
-	    if ((p == "codec") || (p == "compression")) { setp(codec, v.string_value()); }
-	    else if (p == "bitrate") { setp(bitrate, (unsigned int)v.int_value()); }
-	    else if (p == "gop") { setp(gop_size, v.int_value()); }
-	    else if (p == "fps") { setp(fps, v.double_value()); }
-	    else if (p == "title") { setp(title, v.string_value()); }
-	    else if (p == "author") { setp(author, v.string_value()); }
-	    else if (p == "comment") { setp(comment, v.string_value()); }
-	    else {
-		error("avifile: unknown parameter \"%s\"", p.c_str());
-		return retval;
-	    }
-	}
-	i++;
+        std::string p = args(i).string_value();
+        octave_value v = args(i+1);
+        if (!error_state) {
+            if ((p == "codec") || (p == "compression")) { setp(codec, v.string_value()); }
+            else if (p == "bitrate") { setp(bitrate, (unsigned int)v.int_value()); }
+            else if (p == "gop") { setp(gop_size, v.int_value()); }
+            else if (p == "fps") { setp(fps, v.double_value()); }
+            else if (p == "title") { setp(title, v.string_value()); }
+            else if (p == "author") { setp(author, v.string_value()); }
+            else if (p == "comment") { setp(comment, v.string_value()); }
+            else {
+                error("avifile: unknown parameter \"%s\"", p.c_str());
+                return retval;
+            }
+        }
+        i++;
     }
 
     Avifile *m = new Avifile(filename);
     if (error_state) {
-	return retval;
+        return retval;
     }
     m->av->set_codec(codec);
     m->av->set_bitrate(bitrate);
     m->av->set_gop_size(gop_size);
     m->av->set_framerate(fps);
 
-    // AVI muxer currently only has the title tag supported
+    // Doesn't look like these values are ever encoded
     m->av->set_title(title);
     m->av->set_author(author);
     m->av->set_comment(comment);
@@ -128,42 +128,15 @@ To see a list of the available codecs, do @code{avifile(\"codecs\")}.\n\
 
 /*
 %!test
-%!  avifile("codecs")
-
-%!test
-%!  m = avifile("test.avi", "codec", "msmpeg4v2")
+%!  fn="test_avifile1.avi";
+%!  m = avifile(fn, "codec", "mpeg4");
 %!  for i = 1:100
 %!    I = zeros(100,100);
 %!    I(i,:) = i;
 %!    I(:,i) = 200-i;
-%!    addframe(m, I/255)
-%!    printf(".")
+%!    addframe(m, I/255);
 %!  endfor
-%!  printf("\n")
 %!  clear m
-
-%!test
-%!  m = avifile("test2.avi", "codec", "msmpeg4v2")
-%!  for i = 1:100
-%!    I = zeros(100,100,3);
-%!
-%!    for x = 1:100
-%!       I(round(50+10*sin((x+i)/100*4*pi)), x, 1) = 40;
-%!       I(round(50+10*sin((x+i)/100*4*pi)), x, 2) = 40;
-%!       I(round(50+10*sin((x+i)/100*4*pi)), x, 3) = 180;
-%!    endfor
-%!
-%!    I(i,:,1) = 0;
-%!    I(i,:,2) = 50 + i*2;
-%!    I(i,:,3) = 0;
-%!    I(:,i,1) = 200 - i*2;
-%!    I(:,i,2) = 0;
-%!    I(:,i,3) = i*2;
-%!
-%!    addframe(m, I/255)
-%!    printf(".")
-%!  endfor
-%!  printf("\n")
-%!  clear m
-
+%!  assert(exist(fn,"file"))
+%! 	delete(fn)
 */

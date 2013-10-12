@@ -36,19 +36,19 @@ Load frame @var{N} from the AVI file @var{filename}.\n\
     octave_value_list retval;
 
     if (args.length() != 2) {
-	print_usage();
-	return retval;
+        print_usage();
+        return retval;
     }
    
     std::string filename = args(0).string_value();
     if (error_state) {
-	print_usage();
-	return retval;
+        print_usage();
+        return retval;
     }
 
     unsigned int framenr = (unsigned int)args(1).scalar_value();
     if (error_state) {
-	print_usage();
+        print_usage();
     }
 
     AVHandler av = AVHandler();
@@ -56,25 +56,25 @@ Load frame @var{N} from the AVI file @var{filename}.\n\
     av.set_log(&octave_stdout);
 
     if (av.setup_read() != 0) {
-	error("aviread: AVHandler setup failed");
-	return retval;
+        error("aviread: AVHandler setup failed");
+        return retval;
     }
 
     if (av.read_frame(framenr) != 0) {
-	error("aviread: cannot read frame %d", framenr);
-	return retval;
+        error("aviread: cannot read frame %d", framenr);
+        return retval;
     }
 
     AVFrame *frame = av.get_rgbframe();
 
     dim_vector d = dim_vector(av.get_height(), av.get_width(), 3);
     NDArray image = NDArray(d, 0);
-    for (unsigned int y = 0; y < av.get_height(); y++) {	
-	for (unsigned int x = 0; x < av.get_width(); x++) {
-	  image(y, x, 0) = (double)frame->data[0][y * frame->linesize[0] + 3*x + 2]/255;
-	  image(y, x, 1) = (double)frame->data[0][y * frame->linesize[0] + 3*x + 1]/255;
-	  image(y, x, 2) = (double)frame->data[0][y * frame->linesize[0] + 3*x + 0]/255;
-	}
+    for (unsigned int y = 0; y < av.get_height(); y++) {
+        for (unsigned int x = 0; x < av.get_width(); x++) {
+          image(y, x, 0) = (double)frame->data[0][y * frame->linesize[0] + 3*x + 2]/255;
+          image(y, x, 1) = (double)frame->data[0][y * frame->linesize[0] + 3*x + 1]/255;
+          image(y, x, 2) = (double)frame->data[0][y * frame->linesize[0] + 3*x + 0]/255;
+        }
     }
 
     retval.append(octave_value(image));
@@ -92,9 +92,11 @@ Load frame @var{N} from the AVI file @var{filename}.\n\
 %! I = cat(3, I, 0.3*ones(256,256));
 %!
 %! # Display the picture
-%! imshow(I(:,:,1), I(:,:,2), I(:,:,3));
+%! figure(1)
+%! imshow(I);
 %! 
 %! # Write it to the AVI and close the AVI
+%! addframe(x, I);
 %! addframe(x, I);
 %! clear x
 %! 
@@ -102,6 +104,39 @@ Load frame @var{N} from the AVI file @var{filename}.\n\
 %! I = aviread("test.avi", 1);
 %!
 %! # Display the frame read
-%! imshow(I(:,:,1), I(:,:,2), I(:,:,3));
+%! figure(2) 
+%! imshow(I);
+*/
 
+/*
+%!test
+%! fn = tmpnam; 
+%! x = avifile(fn);
+%!
+%! # Generate some picture
+%! I = repmat(0:255, 256, 1)/255;
+%! I = cat(3, I, repmat([0:255]', 1, 256)/255);
+%! I = cat(3, I, 0.3*ones(256,256));
+%!
+%! # Write it to the AVI and close the AVI
+%! addframe(x, I);
+%! addframe(x, I);  #FIXME: aviread currently fails if only 1 frame
+%! clear x
+%! assert(exist(fn,"file"))
+%! I2 = aviread(fn, 1);
+%!
+%! #allow max. 5% difference between pixels
+%! assert(!any((I-I2)(:)>0.05))
+%! delete(fn);
+*/
+
+/*
+%!xtest
+%! fn = tmpnam; 
+%! x = avifile(fn);
+%! I = ones(256,256);
+%! addframe(x, I);
+%! clear x
+%! #FIXME: This fails if there is only 1 frame
+%! I = aviread(fn, 1);
 */

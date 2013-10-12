@@ -51,14 +51,14 @@ Return the properties of an AVI file.\n\
     octave_value_list retval;
 
     if (args.length() != 1) {
-	print_usage();
-	return retval;
+        print_usage();
+        return retval;
     }
    
     std::string filename = args(0).string_value();
     if (error_state) {
-	print_usage();
-	return retval;
+        print_usage();
+        return retval;
     }
 
     AVHandler av = AVHandler();
@@ -66,10 +66,11 @@ Return the properties of an AVI file.\n\
     av.set_log(&octave_stdout);
 
     if (av.setup_read() != 0) {
-	return retval;
+        error("aviread: AVHandler setup failed");
+        return retval;
     }
 
-    Octave_map m;
+    octave_scalar_map m;
 
     m.assign("Filename", av.get_filename());
     m.assign("FileSize", av.get_filesize());

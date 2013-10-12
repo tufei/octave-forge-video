@@ -40,12 +40,12 @@
 #include <errno.h>
 extern "C" {
 #if defined (HAVE_FFMPEG_AVFORMAT_H)
-#include <ffmpeg/avformat.h>
+ #include <ffmpeg/avformat.h>
 #elif defined(HAVE_LIBAVFORMAT_AVFORMAT_H)
-#include <libavformat/avformat.h>
+ #include <libavformat/avformat.h>
 #include <libavformat/avio.h>
 #else
-#error "Missing ffmpeg headers"
+ #error "Missing ffmpeg headers"
 #endif
 }
 #include <iostream>
@@ -119,7 +119,7 @@ class AVHandler {
     AVCodec *codec;
     codec = avcodec_find_decoder(astream->codec->codec_id);
     if (!codec) {
-	return "";
+        return "";
     }
     return std::string(codec->name);
   }
@@ -174,14 +174,14 @@ class AVHandler {
 
   unsigned int get_total_frames() const {
     if (vstream) {
-      return (unsigned int)((double)framerate * vstream->duration / AV_TIME_BASE);
+      return (unsigned int) vstream->nb_frames;
     } else {
       return 0;
     }
   }
 
   unsigned int get_filesize() const {
-    if (av_input && av_input->pb) {
+    if (av_input) {
       return avio_size(av_input->pb);
     } else {
       return 0;

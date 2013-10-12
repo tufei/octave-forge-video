@@ -1,4 +1,4 @@
-#avifile("codecs")
+pkg load video
 
 codec = "msmpeg4v2"
 

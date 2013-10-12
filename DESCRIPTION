@@ -1,12 +1,13 @@
 Name: video
 Version: 1.0.2
 Date: 2009-05-03
-Author: Stefan van der Walt, Roman Stanchak
-Maintainer: Xavier Delacour
+Author: Stefan van der Walt <stefan@sun.ac.za> and Roman Stanchak
+Maintainer: Octave-Forge community <octave-dev@lists.sourceforge.net>
 Title: Video functions
-Description: Implements addframe, avifile, aviinfo, and aviread, using ffmpeg. (and approximately conforms to Matlab interface)
+Description: A wrapper for ffmpeg's libavformat and libavcodec, implementing
+ addframe, avifile, aviinfo, and aviread.
 Depends: octave (>= 2.9.12)
-Autoload: yes
-SystemRequirements: ffmpeg
-License: BSD
+BuildRequires: ffmpeg (>=0.7) [Debian] libavformat-dev [Debian] libswscale-dev
+License: FreeBSD
 Url: http://octave.sf.net
+Url: http://mentat.za.net
